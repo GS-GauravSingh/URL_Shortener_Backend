@@ -27,8 +27,9 @@ const app = express();
 // Middlewares
 app.use(
 	cors({
-		origin: "*", // Asterisk `*` is a wildcard character which means all other domains can access our server.
+		origin: "http://127.0.0.1:5173",
 		methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+		credentials: true, // Allows sending cookies from backend to frontend
 	})
 );
 app.use(express.json()); // to parse json data, and populate json data in req.body.

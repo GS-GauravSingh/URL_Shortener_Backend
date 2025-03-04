@@ -9,8 +9,8 @@ const transporter = nodemailer.createTransport({
 		user: environmentVariables.NODEMAILER_USERNAME,
 		pass: environmentVariables.NODEMAILER_PASSWORD,
 	},
-	logger: true, // Enable logging for debugging
-	debug: true, // Enable debug mode
+	// logger: true, // Enable logging for debugging
+	// debug: true, // Enable debug mode
 });
 
 async function mailer({ recipientEmail, subject, textMessage, htmlMessage }) {
@@ -23,9 +23,9 @@ async function mailer({ recipientEmail, subject, textMessage, htmlMessage }) {
 			html: htmlMessage,
 		});
 
-		console.log("OTP sent successfully: ", info);
+		// console.log("OTP sent successfully: ", info);
 	} catch (error) {
-		console.error("Error sending OTP email:", error);
+		// console.error("Error sending OTP email:", error);
 		throw new Error("Failed to send OTP email");
 	}
 }

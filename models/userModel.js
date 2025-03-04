@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema(
 		email: {
 			type: String,
 			trim: true,
+			unique: true,
 			required: [true, "Email is required."],
 			validate: {
 				validator: function (email) {
@@ -32,6 +33,7 @@ const userSchema = new mongoose.Schema(
 		password: {
 			type: String,
 			required: [true, "Password is required."],
+			minLength: [6, "Password must be at least 6 characters long."],
 		},
 
 		passwordChangedAt: {

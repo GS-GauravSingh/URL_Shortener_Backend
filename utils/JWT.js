@@ -11,7 +11,7 @@ const verifyJwtToken = (token) => {
 	try {
 		return jsonWebToken.verify(token, environmentVariables.JWT_SECRET_KEY);
 	} catch (error) {
-		return null; // Return `null` if the token is invalid or expired
+		throw new Error("Token is either invalid or expired.");
 	}
 };
 

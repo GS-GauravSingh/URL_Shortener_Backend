@@ -5,6 +5,7 @@ const CustomError = require("../utils/CustomError");
 const otpGenerator = require("otp-generator");
 const mailer = require("../utils/mailer");
 const { generateJwtToken, verifyJwtToken } = require("../utils/JWT");
+const environmentVariables = require("../environmentVariables");
 
 // Register/Signup
 module.exports.register = asyncHandler(async (req, res, next) => {
@@ -17,8 +18,8 @@ module.exports.register = asyncHandler(async (req, res, next) => {
 	});
 
 	if (accountAlreadyExists && accountAlreadyExists.verified) {
-		// it means account already exists. and its verified
-		return next(new CustomError("Account already exists!!", 400));
+		// Account already exists and is verified
+		throw new CustomError("Account already exists! Login Instead.", 400);
 	}
 
 	if (accountAlreadyExists && !accountAlreadyExists.verified) {
@@ -60,7 +61,7 @@ module.exports.sendOTP = asyncHandler(async (req, res, next) => {
 	user.otpExpiryTime = Date.now() + 2 * 60 * 1000; // once generated OTP will expire in 2 minutes.
 
 	// save the changes
-	const updatedUser = await user.save({
+	await user.save({
 		validateModifiedOnly: true, // run validation on updated fields only.
 	});
 
@@ -81,7 +82,7 @@ module.exports.sendOTP = asyncHandler(async (req, res, next) => {
 	// Step 5: if we reach this step, it means OTP sent successfully.
 	return res.status(200).json({
 		status: "success",
-		message: "OTP sent successfully!",
+		message: "OTP Sent Successfully!",
 	});
 });
 
@@ -95,7 +96,8 @@ module.exports.resendOTP = asyncHandler(async (req, res, next) => {
 
 	// simple check: whether user with given email is present in the database or not.
 	if (!user) {
-		return next(new CustomError("Invalid email: User not found.", 400));
+		// return next(new CustomError("Invalid email: User not found.", 400));
+		throw new CustomError("Invalid email: User not found.", 400);
 	}
 
 	// Step 2: Generate a 4-digit OTP using the `otp-generator` npm package.
@@ -130,7 +132,7 @@ module.exports.resendOTP = asyncHandler(async (req, res, next) => {
 	// Step 5: if we reach this step, it means OTP sent successfully.
 	return res.status(200).json({
 		status: "success",
-		message: "OTP sent successfully!",
+		message: "OTP Re-Sent Successfully!",
 	});
 });
 
@@ -144,33 +146,31 @@ module.exports.verifyOTP = asyncHandler(async (req, res, next) => {
 	const user = await UserModel.findOne({
 		email: email,
 		otpExpiryTime: { $gt: Date.now() },
-	});
+	}).select("-password");
 
 	// Step 2: If the OTP has expired then we are unable to find the document in the above query. In this case the `user` will be `null`.
 	if (!user) {
 		// OTP has expired.
-		return next(
-			new CustomError(
-				"Either the email was incorrect, or the OTP was expired.",
-				400
-			)
+		throw new CustomError(
+			"Either the email was incorrect, or the OTP was expired.",
+			400
 		);
 	}
 
 	// Step 3: Check whether user is already verified or not.
 	if (user.verified) {
 		// User is already verified
-		return next(new CustomError("Email is already verified.", 400));
+		throw new CustomError("Email is already verified.", 400);
 	}
 
 	// Step 4: Check whether user enters the correct otp or not.
 	if (!(await user.isOtpCorrect(otp))) {
-		return next(new CustomError("Incorrect OTP!!"));
+		throw new CustomError("Incorrect OTP!!", 400);
 	}
 
 	// Step 5: if we reach here, it means user entered the correct OTP. Now generate JWT token and send a successfull response.
 
-	// But first ser the user to verified.
+	// But first, set the user to verified.
 	user.verified = true;
 	user.otp = undefined;
 	user.otpExpiryTime = undefined;
@@ -181,20 +181,22 @@ module.exports.verifyOTP = asyncHandler(async (req, res, next) => {
 	});
 
 	const token = generateJwtToken({ userId: user._id });
-	return res
-		.status(200)
-		.cookie("token", token, {
-			httpOnly: true, // Prevents client-side JavaScript from accessing the cookie (helps prevent XSS attacks).
-			secure: true, // Ensures the cookie is only sent over HTTPS.
-			sameSite: "Strict", // Prevents the cookie from being sent along with cross-site requests (helps mitigate CSRF attacks).
-			expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Sets an expiration time (7 days in this case).
-		})
-		.json({
-			status: "success",
-			message: "OTP verification complete",
-			token,
-			user: updatedUser,
-		});
+
+	const cookieOptions = {
+		httpOnly: true,
+		expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+	};
+
+	if (environmentVariables.NODE_ENV === "production") {
+		cookieOptions.secure = true; // Ensures the cookie is only sent over HTTPS.
+	}
+
+	return res.status(201).cookie("token", token, cookieOptions).json({
+		status: "success",
+		message: "Email Verified Successfully.",
+		user: updatedUser,
+		token,
+	});
 });
 
 // Login/Signin
@@ -204,98 +206,93 @@ module.exports.login = asyncHandler(async (req, res, next) => {
 
 	// simple check: if any of the required fileds are missing.
 	if (!email || !password) {
-		return next(
-			new CustomError(
-				"Some required fields are missing. Both email and password is required.",
-				400
-			)
+		throw new CustomError(
+			"Some required fields are missing. Both email and password is required.",
+			400
 		);
 	}
 
 	// Step 1: find the user.
-	const user = UserModel.findOne({ email: email }).select("+password");
+	const user = await UserModel.findOne({ email: email }).select("+password");
 	//  `.select("+password")` method in Mongoose is used to explicitly include a field that is excluded by default in the schema.
 
 	// simple check: we are able to find the user document or not.
 	if (!user) {
-		return next(
-			new CustomError("No record found for this email address.", 400)
-		);
+		throw new CustomError("User not found, Signup instead.", 400);
 	}
 
 	// Step 2: check whether user entered the correct password or not.
 	if (!(await user.isPasswordCorrect(password))) {
-		return next(new CustomError("Incorrect Password!!", 400));
+		throw new CustomError("Incorrect Password!!", 400);
 	}
 
 	// Step 3: Password is correct. Not, generate JWT token and send a successfull response.
 	const token = generateJwtToken({ userId: user._id });
-	return res
-		.status(200)
-		.cookie("token", token, {
-			httpOnly: true, // Prevents client-side JavaScript from accessing the cookie (helps prevent XSS attacks).
-			secure: true, // Ensures the cookie is only sent over HTTPS.
-			sameSite: "Strict", // Prevents the cookie from being sent along with cross-site requests (helps mitigate CSRF attacks).
-			expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Sets an expiration time (7 days in this case).
-		})
-		.json({
-			status: "success",
-			message: "Logged in successfully!",
-			token,
-			user: user,
-		});
+
+	// we don't want to send the password field to the client.
+	user.password = undefined; // we are not saving this change because saving the document will make the password field undefined in the database and we don't want that.
+
+	const cookieOptions = {
+		httpOnly: true,
+		expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+	};
+
+	if (environmentVariables.NODE_ENV === "production") {
+		cookieOptions.secure = true; // Ensures the cookie is only sent over HTTPS.
+	}
+
+	return res.status(200).cookie("token", token, cookieOptions).json({
+		status: "success",
+		message: "Logged In Successfully!",
+		user,
+		token,
+	});
 });
 
 // isUserAuthenticated
 module.exports.isUserAuthenticated = asyncHandler(async (req, res, next) => {
-	// extract token (Json Web Token), it can be present in cookies, or in headers.
-	try {
-		const token = req.cookies.token;
+	let token;
 
-		// check if token exists or not.
-		if (!token) {
-			return res.status(401).json({
-				message:
-					"You are not logged in! Please log in to access the application.",
-			});
-		}
-
-		// decode the token
-		const decoded = verifyJwtToken(token);
-
-		// At the time of token generation we have used `user document id (userId)` as our payload.
-		// Now, we just check whether user with the id `userId` still present or not.
-		const user = await UserModel.findById(decoded.userId);
-
-		if (!user) {
-			// User doesn't exists.
-			return next(
-				new CustomError(
-					"The user belongs to this token no longes exists.",
-					401
-				)
-			);
-		}
-
-		// if the user recently changed their account password, then we have to check whether the token is a valid token or not.
-		// if the token was generated after the password changed, then it is correct. Otherwise, is is invalid.
-		if (!user.isTokenValid(decoded.iat)) {
-			return next(
-				new CustomError(
-					"Invalid Token: Possible that the user has recently changed their account password.",
-					401
-				)
-			);
-		}
-
-		// All check are done, pass the flow to next middleware.
-		req.user = user;
-		next();
-	} catch (error) {
-		console.log("Error: isUserAuthenticated: ", error);
-		return res.status(401).json({
-			status: "Error",
-			message: "Authentication Failed!!",
-		});
+	// Extract the token, it can be present in cookies or in headers.
+	if (
+		req.headers.authorization &&
+		req.headers.authorization.startsWith("Bearer")
+	) {
+		token = req.headers.authorization.split(" ")[1];
+	} else if (req.cookies.token) {
+		token = req.cookies.token;
 	}
+
+	// check if token exists
+	if (!token) {
+		throw new CustomError(
+			"You are not logged in! Please log in to access the application.",
+			401
+		);
+	}
+
+	// Decode the token
+	const decoded = verifyJwtToken(String(token));
+
+	// Check if the user still exists
+	const user = await UserModel.findById(decoded.userId).select("-password");
+
+	if (!user) {
+		throw new CustomError(
+			"The user belonging to this token no longer exists. Log-in instead.",
+			401
+		);
+	}
+
+	// Check if the token is still valid (after a password change)
+	if (!user.isTokenValid(decoded.iat)) {
+		throw new CustomError(
+			"Invalid Token: The user may have recently changed their password.",
+			401
+		);
+	}
+
+	// Attach user to request object
+	req.user = user;
+	next();
 });

@@ -5,17 +5,22 @@ const urlSchema = new mongoose.Schema(
 		createdBy: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "User",
-			required: true,
+			required: [true, "Author is required."],
 		},
 
 		originalUrl: {
 			type: String,
-			required: true,
+			required: [true, "Original URL is required."],
+		},
+
+		shortenUrl: {
+			type: String,
+			required: [true, "Shorten URL is required."],
 		},
 
 		shortId: {
 			type: String,
-			required: true,
+			required: [true, "Short Id is required."],
 			unique: true,
 		},
 
