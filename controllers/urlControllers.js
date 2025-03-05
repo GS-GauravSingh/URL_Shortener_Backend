@@ -21,7 +21,7 @@ module.exports.generateNewShortUrl = asyncHandler(async (req, res, next) => {
 		createdBy: user._id,
 		originalUrl: url,
 		shortId: shortId,
-		shortenUrl: `http://localhost:${environmentVariables.PORT}/${shortId}`,
+		shortenUrl: `https://url-shortener-backend-yzcs.onrender.com/${shortId}`,
 		visitHistory: [],
 	});
 
