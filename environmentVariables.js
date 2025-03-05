@@ -4,7 +4,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const environmentVariables = {
-	PORT: process.env.PORT,
+	PORT: process.env.PORT || "8000",
 	MONGO_DB_URL: process.env.MONGO_DB_URL,
 	NODEMAILER_USERNAME: process.env.NODEMAILER_USERNAME,
 	NODEMAILER_PASSWORD: process.env.NODEMAILER_PASSWORD,
