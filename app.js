@@ -1,5 +1,8 @@
 const express = require("express");
 
+// The `express-rate-limit` npm package  is used in Express.js applications to limit the number of API requests a client can make within a specified time frame.
+const expressRateLimit = require("express-rate-limit");
+
 // `express-mongo-sanitize` is a middleware used to remove malicious data from user supplied data, by default, $ and . characters are removed completely from the user supplied data that may present in: req.body, req.params, req.headers, and req.query.
 const expressMongoSanitize = require("express-mongo-sanitize");
 
@@ -27,7 +30,7 @@ const app = express();
 // Middlewares
 app.use(
 	cors({
-		origin: "https://url-shortener-frontend-v65a.onrender.com",
+		origin: "https://url-shortener-backend-yzcs.onrender.com",
 		methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 		credentials: true, // Allows sending cookies from backend to frontend
 	})
@@ -37,6 +40,15 @@ app.use(express.urlencoded({ extended: true })); // to parse form data, and popu
 app.use(cookieParser()); // used to parse cookies.
 app.use(hpp()); // Protect against HTTP Parameter Pollution.
 app.use(expressMongoSanitize()); // Prevent NoSQL Injection Attacks.
+
+const limiter = expressRateLimit({
+	windowMs: 60 * 60 * 1000, // 1 hour in Milliseconds
+	max: 50, // Limit each IP to 50 requests per windowMs
+	message: "Too many requests. Please try again later.",
+});
+
+// applying rate limiter to all the API endpoints that starts with "/api/v1/url".
+app.use("/api/v1/url", limiter);
 
 // Routes
 
