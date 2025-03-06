@@ -30,7 +30,7 @@ const app = express();
 // Middlewares
 app.use(
 	cors({
-		origin: "https://url-shortener-backend-yzcs.onrender.com",
+		origin: "https://url-shortener-frontend-v65a.onrender.com",
 		methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 		credentials: true, // Allows sending cookies from backend to frontend
 	})
